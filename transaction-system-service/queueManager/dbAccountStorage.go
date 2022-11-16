@@ -36,7 +36,7 @@ func (s *DBAccountStorage) init() error {
 	return err
 }
 
-func (s *DBAccountStorage) GetBalance() (int, error) {
+func (s *DBAccountStorage) GetBalance(userID string) (int, error) {
 	panic("NOT IMPLEMENTED")
 }
 

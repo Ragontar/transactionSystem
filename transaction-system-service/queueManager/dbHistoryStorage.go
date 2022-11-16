@@ -40,6 +40,6 @@ func (s *DBHistoryStorage) Save(Transaction) error {
 	panic("NOT IMPLEMENTED")
 }
 
-func (s *DBHistoryStorage) Load() ([]Transaction, error) {
+func (s *DBHistoryStorage) Load(userID string) ([]Transaction, error) {
 	panic("NOT IMPLEMENTED")
 }

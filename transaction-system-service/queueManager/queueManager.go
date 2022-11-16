@@ -15,7 +15,7 @@ const (
 
 type HistoryStorage interface {
 	Save(Transaction) error
-	Load() ([]Transaction, error)
+	Load(userID string) ([]Transaction, error)
 }
 
 type AccountStorage interface {
@@ -34,7 +34,7 @@ type TransactionQueueManager struct {
 	UserID             string
 	Balance            int
 	mu                 sync.Mutex
-	TransactionQueue   []Transaction
+	TransactionQueue   []*Transaction
 	TransactionHistory []Transaction
 
 	historyStorage HistoryStorage
@@ -45,7 +45,7 @@ func NewTransactionQueueManager(userID string, hs HistoryStorage, as AccountStor
 	tqm := TransactionQueueManager{UserID: userID, historyStorage: hs, accountStorage: as}
 
 	var err error
-	tqm.TransactionHistory, err = tqm.historyStorage.Load()
+	tqm.TransactionHistory, err = tqm.historyStorage.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,10 @@ func (tqm *TransactionQueueManager) ExecuteNext() bool {
 	return true
 }
 
-func (tqm *TransactionQueueManager) Enqueue(t Transaction) error {
+func (tqm *TransactionQueueManager) Enqueue(t *Transaction) error {
+	if t == nil {
+		return errors.New("transaction is nil")
+	}
 	if t.Amount <= 0 {
 		return errors.New("incorrect amount")
 	}
@@ -89,7 +92,7 @@ func (tqm *TransactionQueueManager) Enqueue(t Transaction) error {
 	return nil
 }
 
-func (tqm *TransactionQueueManager) acceptTransaction(t Transaction) error {
+func (tqm *TransactionQueueManager) acceptTransaction(t *Transaction) error {
 	if t.Operation == OperationDec {
 		tqm.Balance = tqm.Balance - t.Amount
 	}
@@ -102,19 +105,19 @@ func (tqm *TransactionQueueManager) acceptTransaction(t Transaction) error {
 		t.Response <- "error"
 		return err
 	}
-	err = tqm.historyStorage.Save(t)
+	err = tqm.historyStorage.Save(*t)
 	if err != nil {
 		t.Response <- "error"
 		return err
 	}
-	tqm.TransactionHistory = append(tqm.TransactionHistory, t)
+	tqm.TransactionHistory = append(tqm.TransactionHistory, *t)
 
 	t.Response <- "accepted"
 
 	return nil
 }
 
-func (tqm *TransactionQueueManager) rejectTransaction(t Transaction) error {
+func (tqm *TransactionQueueManager) rejectTransaction(t *Transaction) error {
 	t.Response <- "rejected"
 	//cringe
 	return nil
