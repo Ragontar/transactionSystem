@@ -41,6 +41,8 @@ func processRequest(operation queueManager.Operation, w http.ResponseWriter, r *
 			return
 		}
 		activeWorkers[userID] = tqm
+
+		tqm.StartQueueProcessor()
 	}
 
 	var requestData Transaction
@@ -52,6 +54,7 @@ func processRequest(operation queueManager.Operation, w http.ResponseWriter, r *
 	}
 	json.Unmarshal(b, &requestData)
 	t := queueManager.Transaction{
+		AccountID: tqm.AccountID,
 		Operation: operation,
 		Amount: requestData.Amount,
 		Response: make(chan string),

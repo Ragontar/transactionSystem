@@ -2,7 +2,6 @@ package queueManager
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 
@@ -21,9 +20,11 @@ type HistoryStorage interface {
 type AccountStorage interface {
 	GetBalance(userID string) (int, error)
 	UpdateBalance(userID string, value int) error
+	GetAccountID(userID string) (string, error)
 }
 
 type Transaction struct {
+	AccountID string
 	Operation Operation
 	Amount    int
 	Date      time.Time
@@ -32,9 +33,9 @@ type Transaction struct {
 
 type TransactionQueueManager struct {
 	UserID             string
+	AccountID          string
 	Balance            int
-	mu                 sync.Mutex
-	TransactionQueue   []*Transaction
+	TransactionQueue   chan *Transaction
 	TransactionHistory []Transaction
 
 	historyStorage HistoryStorage
@@ -49,22 +50,22 @@ func NewTransactionQueueManager(userID string, hs HistoryStorage, as AccountStor
 	if err != nil {
 		return nil, err
 	}
+	tqm.AccountID, err = tqm.accountStorage.GetAccountID(tqm.UserID)
+	if err != nil {
+		return nil, err
+	}
 	tqm.Balance, err = tqm.accountStorage.GetBalance(tqm.UserID)
+	tqm.TransactionQueue = make(chan *Transaction, 100)
 
 	return &tqm, err
 }
 
 func (tqm *TransactionQueueManager) ExecuteNext() bool {
-	if len(tqm.TransactionQueue) == 0 {
-		return false
-	}
-	tqm.mu.Lock()
-	t := tqm.TransactionQueue[0]
-	tqm.TransactionQueue = tqm.TransactionQueue[1:]
-	tqm.mu.Unlock()
+	t := <-tqm.TransactionQueue
 
 	if t.Operation == OperationDec && t.Amount > tqm.Balance {
 		tqm.rejectTransaction(t)
+		return true
 	}
 	err := tqm.acceptTransaction(t)
 	if err != nil {
@@ -85,28 +86,32 @@ func (tqm *TransactionQueueManager) Enqueue(t *Transaction) error {
 		return errors.New("bad operation")
 	}
 
-	tqm.mu.Lock()
-	tqm.TransactionQueue = append(tqm.TransactionQueue, t)
-	tqm.mu.Unlock()
+	tqm.TransactionQueue <- t
 
 	return nil
 }
 
 func (tqm *TransactionQueueManager) acceptTransaction(t *Transaction) error {
+	oldBalance := tqm.Balance
 	if t.Operation == OperationDec {
 		tqm.Balance = tqm.Balance - t.Amount
 	}
-	if t.Operation == OperationInc{
+	if t.Operation == OperationInc {
 		tqm.Balance = tqm.Balance + t.Amount
 	}
 
 	err := tqm.accountStorage.UpdateBalance(tqm.UserID, tqm.Balance)
 	if err != nil {
+		tqm.Balance = oldBalance
 		t.Response <- "error"
 		return err
 	}
 	err = tqm.historyStorage.Save(*t)
 	if err != nil {
+		// ? UpdateBalance error case?
+		tqm.Balance = oldBalance
+		tqm.accountStorage.UpdateBalance(tqm.UserID, tqm.Balance)
+		// ?
 		t.Response <- "error"
 		return err
 	}
@@ -121,4 +126,12 @@ func (tqm *TransactionQueueManager) rejectTransaction(t *Transaction) error {
 	t.Response <- "rejected"
 	//cringe
 	return nil
+}
+
+func (tqm *TransactionQueueManager) StartQueueProcessor() {
+	go func() {
+		for {
+			tqm.ExecuteNext()
+		}
+	}()
 }

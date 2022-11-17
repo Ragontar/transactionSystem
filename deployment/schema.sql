@@ -5,7 +5,7 @@
 -- Dumped from database version 14.4
 -- Dumped by pg_dump version 14.5 (Ubuntu 14.5-1.pgdg22.04+1)
 
--- Started on 2022-11-16 16:37:57 MSK
+-- Started on 2022-11-17 12:39:32 MSK
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -42,6 +42,15 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- TOC entry 3343 (class 0 OID 0)
+-- Dependencies: 3342
+-- Name: DATABASE postgres; Type: COMMENT; Schema: -; Owner: postgres
+--
+
+COMMENT ON DATABASE postgres IS 'default administrative connection database';
+
+
+--
 -- TOC entry 3 (class 2615 OID 2200)
 -- Name: public; Type: SCHEMA; Schema: -; Owner: postgres
 --
@@ -50,6 +59,15 @@ CREATE SCHEMA public;
 
 
 ALTER SCHEMA public OWNER TO postgres;
+
+--
+-- TOC entry 3344 (class 0 OID 0)
+-- Dependencies: 3
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
 
 SET default_tablespace = '';
 
@@ -79,7 +97,7 @@ CREATE TABLE public.transaction_history (
     account_id uuid NOT NULL,
     operation character varying(1) NOT NULL,
     value integer NOT NULL,
-    date date NOT NULL,
+    date timestamp with time zone NOT NULL,
     CONSTRAINT ckeck_operation CHECK (((operation)::text = ANY ((ARRAY['+'::character varying, '-'::character varying])::text[])))
 );
 
@@ -154,7 +172,7 @@ ALTER TABLE ONLY public.accounts
     ADD CONSTRAINT fk_owner FOREIGN KEY (owner_id) REFERENCES public.users(user_id);
 
 
--- Completed on 2022-11-16 16:37:57 MSK
+-- Completed on 2022-11-17 12:39:32 MSK
 
 --
 -- PostgreSQL database dump complete
